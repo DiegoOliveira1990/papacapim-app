@@ -1,11 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { registerUser } from '../api';
 
 export default function SignupScreen({ navigation }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+
+  const handleSignup = async () => {
+    try {
+      const result = await registerUser(name, email, username, password);
+      Alert.alert('Sucesso', 'Cadastro realizado com sucesso!');
+      navigation.navigate('Login');
+    } catch (error) {
+      Alert.alert('Erro', 'Falha ao registrar. Por favor tente novamente.');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -36,7 +47,7 @@ export default function SignupScreen({ navigation }) {
         secureTextEntry
         onChangeText={setPassword}
       />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Login')}>
+      <TouchableOpacity style={styles.button} onPress={(handleSignup)}>
         <Text style={styles.buttonText}>Cadastrar</Text>
       </TouchableOpacity>
     </View>

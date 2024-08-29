@@ -1,9 +1,21 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Alert } from 'react-native';
+import { loginUser } from '../api';
 
 export default function LoginScreen({ navigation }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+
+  const handleLogin = async () => {
+    try {
+      const result = await loginUser(username, password);
+      Alert.alert('Successo', 'Login realizado com successo!');
+      // Você pode armazenar o token de autenticação e navegar para a tela principal
+      navigation.navigate('Feed');
+    } catch (error) {
+      Alert.alert('Erro', 'Falha no login. Por favor revise os seus dados.');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -22,7 +34,7 @@ export default function LoginScreen({ navigation }) {
         secureTextEntry
         onChangeText={setPassword}
       />
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Feed')}>
+      <TouchableOpacity style={styles.button} onPress={handleLogin}>
         <Text style={styles.buttonText}>Login</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Signup')}>
