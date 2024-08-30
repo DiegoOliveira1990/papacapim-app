@@ -1,8 +1,35 @@
 import React from 'react';
 import { View, Text, Image, FlatList, TouchableOpacity, Button, StyleSheet } from 'react-native';
+import { logoutUser } from '../api';
 
 export default function FeedScreen({ navigation }) {
-  // Dados fictícios de postagens
+  const [sessionId, setSessionId] = useState(null);
+
+  useEffect(() => {
+    const fetchSessionId = async () => {
+      const id = await AsyncStorage.getItem('sessionId');
+      setSessionId(id);
+    };
+
+    fetchSessionId();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      if (sessionId) {
+        await logoutUser(sessionId);
+        await AsyncStorage.removeItem('sessionId');
+        await AsyncStorage.removeItem('sessionToken');
+        Alert.alert('Logged out', 'You have been logged out successfully.');
+        navigation.navigate('Login');
+      } else {
+        Alert.alert('Error', 'No active session found.');
+      }
+    } catch (error) {
+      Alert.alert('Logout Error', 'Failed to logout. Please try again.');
+    }
+  };
+
   const dummyPosts = [
     {
       id: '1',
@@ -65,6 +92,9 @@ export default function FeedScreen({ navigation }) {
         </TouchableOpacity>
         <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('EditProfile')}>
           <Text style={styles.buttonText}>Editar Perfil</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button} onPress={handleLogout}>
+          <Text style={styles.buttonText}>Logout</Text>
         </TouchableOpacity>
       </View>
     </View>

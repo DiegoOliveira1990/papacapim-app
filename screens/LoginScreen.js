@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginUser } from '../api';
 
 export default function LoginScreen({ navigation }) {
-  const [username, setUsername] = useState('');
+  const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
 
   const handleLogin = async () => {
     try {
-      const result = await loginUser(username, password);
-      Alert.alert('Successo', 'Login realizado com successo!');
-      // Você pode armazenar o token de autenticação e navegar para a tela principal
+      const result = await loginUser(login, password);
+      const sessionId = result.id; // ID da sessão retornada pelo servidor
+      const token = result.token; // Token de autenticação retornado pelo servidor
+
+      // Armazene o ID da sessão e o token no AsyncStorage
+      await AsyncStorage.setItem('sessionId', sessionId.toString());
+      await AsyncStorage.setItem('sessionToken', token);
+
+      Alert.alert('Success', 'Login successful!');
       navigation.navigate('Feed');
     } catch (error) {
-      Alert.alert('Erro', 'Falha no login. Por favor revise os seus dados.');
+      if (error.response && error.response.data.errors) {
+        Alert.alert('Login Error', 'Invalid login or password.');
+      } else {
+        Alert.alert('Error', 'Failed to login. Please check your credentials.');
+      }
     }
   };
 
@@ -24,8 +35,8 @@ export default function LoginScreen({ navigation }) {
       <TextInput
         style={styles.input}
         placeholder="Usuário"
-        value={username}
-        onChangeText={setUsername}
+        value={login}
+        onChangeText={setLogin}
       />
       <TextInput
         style={styles.input}
