@@ -20,11 +20,8 @@ export default function LoginScreen({ navigation }) {
       Alert.alert('Success', 'Login successful!');
       navigation.navigate('Feed');
     } catch (error) {
-      if (error.response && error.response.data.errors) {
-        Alert.alert('Login Error', 'Invalid login or password.');
-      } else {
-        Alert.alert('Error', 'Failed to login. Please check your credentials.');
-      }
+      console.error('Login Error:', error.response ? error.response.data : error.message);
+      Alert.alert('Error', error.response?.data?.message || 'Failed to login. Please check your credentials.');
     }
   };
 

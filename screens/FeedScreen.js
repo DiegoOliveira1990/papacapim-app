@@ -1,5 +1,6 @@
-import React from 'react';
-import { View, Text, Image, FlatList, TouchableOpacity, Button, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { logoutUser } from '../api';
 
 export default function FeedScreen({ navigation }) {
@@ -8,7 +9,12 @@ export default function FeedScreen({ navigation }) {
   useEffect(() => {
     const fetchSessionId = async () => {
       const id = await AsyncStorage.getItem('sessionId');
-      setSessionId(id);
+      if (id) {
+        setSessionId(id);
+      } else {
+        Alert.alert('Error', 'No active session found. Please login again.');
+        navigation.navigate('Login');
+      }
     };
 
     fetchSessionId();
@@ -26,7 +32,8 @@ export default function FeedScreen({ navigation }) {
         Alert.alert('Error', 'No active session found.');
       }
     } catch (error) {
-      Alert.alert('Logout Error', 'Failed to logout. Please try again.');
+      console.error('Logout Error:', error.response ? error.response.data : error.message);
+      Alert.alert('Logout Error', error.response?.data?.message || 'Failed to logout. Please try again.');
     }
   };
 
