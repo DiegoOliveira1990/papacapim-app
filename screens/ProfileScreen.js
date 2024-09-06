@@ -1,38 +1,42 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import { getUser } from '../api'; // Função para buscar o usuário
 
-export default function ProfileScreen({ route, navigation }) {
-  const { userId } = route.params; // Recebe o userId do usuário passado pela navegação
+export default function ProfileScreen({ route }) {
+  const { login } = route.params; // Obtendo o login passado pela navegação
+  const [user, setUser] = useState(null); // Estado para armazenar os dados do usuário
+  const [loading, setLoading] = useState(true); // Estado para controlar o carregamento
 
-  // Dados fictícios de usuários (poderia ser obtido de uma API)
-  const users = {
-    user1: {
-      name: 'Diego Oliveira',
-      bio: 'Estudante de tecnologia',
-      posts: 5,
-    },
-    user2: {
-      name: 'Rebeca',
-      bio: 'Aventureira.',
-      posts: 8,
-    },
-    user3: {
-      name: 'Sérgio Reis',
-      bio: 'Pai de Pet.',
-      posts: 12,
-    },
-  };
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        console.log('Fetching user data for login:', login); // Verificando o login passado
+        const userData = await getUser(login); // Chamando a função da API para obter os dados do usuário
+        setUser(userData); // Armazenando os dados do usuário no estado
+        setLoading(false); // Finalizando o carregamento
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        setLoading(false); // Finalizando o carregamento, mesmo em caso de erro
+      }
+    };
 
-  const user = users[userId];
+    fetchUserData(); // Executa a busca dos dados do usuário quando a tela é carregada
+  }, [login]);
+
+  if (loading) {
+    return <ActivityIndicator size="large" color="#0000ff" />;
+  }
+
+  if (!user) {
+    return <Text style={styles.errorText}>Usuário não encontrado</Text>;
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{user.name}</Text>
-      <Text style={styles.info}>Bio: {user.bio}</Text>
-      <Text style={styles.info}>Posts: {user.posts}</Text>
-      <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
-          <Text style={styles.buttonText}>Voltar para o Feed</Text>
-      </TouchableOpacity>
+      <Text style={styles.userName}>Nome: {user.name}</Text>
+      <Text style={styles.userLogin}>Login: {user.login}</Text>
+      <Text style={styles.userCreatedAt}>Criado em: {new Date(user.created_at).toLocaleDateString()}</Text>
+      {/* Adicione outras informações do usuário conforme necessário */}
     </View>
   );
 }
@@ -40,26 +44,25 @@ export default function ProfileScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-  },
-  title: {
-    fontSize: 24,
-    marginBottom: 16,
-  },
-  info: {
-    fontSize: 18,
-    marginBottom: 8,
-  },
-  button: {
-    backgroundColor: '#007bff',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 5,
+    padding: 20,
   },
-  buttonText: {
-    color: '#fff',
+  userName: {
+    fontSize: 24,
+    
+  },
+  userLogin: {
     fontSize: 18,
+    color: 'gray',
+  },
+  userCreatedAt: {
+    fontSize: 16,
+    color: 'blue',
+    marginTop: 10,
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
   },
 });

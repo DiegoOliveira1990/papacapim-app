@@ -6,22 +6,24 @@ import { logoutUser } from '../api';
 export default function FeedScreen({ navigation }) {
   const [sessionId, setSessionId] = useState(null);
   const [sessionToken, setSessionToken] = useState(null);
+  const [userLogin, setUserLogin] = useState(null); // Adiciona um estado para o login do usuário
 
   useEffect(() => {
-    // Carregar o sessionId e sessionToken ao carregar a tela
     const fetchSessionData = async () => {
       try {
         const storedSessionId = await AsyncStorage.getItem('sessionId');
         const storedSessionToken = await AsyncStorage.getItem('sessionToken');
+        const storedUserLogin = await AsyncStorage.getItem('userLogin'); // Obtém o login do usuário logado
         setSessionId(storedSessionId);
         setSessionToken(storedSessionToken);
+        setUserLogin(storedUserLogin); // Armazena o login no estado
       } catch (error) {
         console.error('Failed to load session data:', error);
         Alert.alert('Error', 'Failed to load session data.');
       }
     };
 
-    fetchSessionData(); // Chama a função quando a tela é carregada
+    fetchSessionData();
   }, []);
 
   const handleLogout = async () => {
@@ -32,9 +34,9 @@ export default function FeedScreen({ navigation }) {
 
         await logoutUser(sessionId);
 
-        // Remover sessão do AsyncStorage
         await AsyncStorage.removeItem('sessionId');
         await AsyncStorage.removeItem('sessionToken');
+        await AsyncStorage.removeItem('userLogin');
 
         Alert.alert('Logged out', 'You have been logged out successfully.');
         navigation.navigate('Login');
@@ -56,7 +58,7 @@ export default function FeedScreen({ navigation }) {
         avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
       },
       content: 'Olá, essa é minha primeira postagem!!!',
-      image: 'https://picsum.photos/300/200', // Imagem fictícia para a postagem
+      image: 'https://picsum.photos/300/200',
     },
     {
       id: '2',
@@ -66,26 +68,14 @@ export default function FeedScreen({ navigation }) {
         avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
       },
       content: 'Algum dia, em algum lugar!',
-      image: 'https://picsum.photos/300/201', // Imagem fictícia para a postagem
-    },
-    {
-      id: '3',
-      user: {
-        id: 'user3',
-        name: 'Sérgio Reis',
-        avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
-      },
-      content: 'Amo a vida no campo!',
-      image: 'https://picsum.photos/300/202', // Imagem fictícia para a postagem
+      image: 'https://picsum.photos/300/201',
     },
   ];
 
   // Renderiza cada item da lista de postagens
   const renderItem = ({ item }) => (
     <View style={styles.postContainer}>
-      <TouchableOpacity
-        onPress={() => navigation.navigate('Profile', { userId: item.user.id })}
-      >
+      <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user.id })}>
         <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
       </TouchableOpacity>
       <View style={styles.postContent}>
@@ -98,18 +88,22 @@ export default function FeedScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={dummyPosts}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-      />
+      <FlatList data={dummyPosts} renderItem={renderItem} keyExtractor={(item) => item.id} />
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Post')}>
           <Text style={styles.buttonText}>Novo Post</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate('Profile', { login: userLogin })}>
+          <Text style={styles.buttonText}>Perfil</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('EditProfile')}>
           <Text style={styles.buttonText}>Editar Perfil</Text>
         </TouchableOpacity>
+
         <TouchableOpacity style={styles.button} onPress={handleLogout}>
           <Text style={styles.buttonText}>Logout</Text>
         </TouchableOpacity>

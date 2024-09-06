@@ -39,12 +39,21 @@ export const registerUser = async (login, name, password, password_confirmation)
   }
 };
 
+// Função para realizar o login e armazenar a sessão
 export const loginUser = async (login, password) => {
   try {
     const response = await api.post('/sessions', {
       login,
       password,
     });
+
+    const { id, token, user_login } = response.data;
+
+    // Armazenando sessionId, sessionToken, e userLogin no AsyncStorage
+    await AsyncStorage.setItem('sessionId', id.toString());
+    await AsyncStorage.setItem('sessionToken', token);
+    await AsyncStorage.setItem('userLogin', user_login);
+
     return response.data;
   } catch (error) {
     console.error('Login Error:', error.response ? error.response.data : error.message);
@@ -102,6 +111,20 @@ export const updateUser = async (userId, login, name, password, password_confirm
   }
 };
 
+//Deletar usuário
+export const deleteUser = async (userId) => {
+  try {
+    const token = await AsyncStorage.getItem('sessionToken');
+    const response = await api.delete(`/users/${userId}`, {
+      headers: { 'x-session-token': token },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Delete User Error:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
 // Listar Usuários
 export const listUsers = async (search = '', page = 1) => {
   try {
@@ -118,7 +141,8 @@ export const listUsers = async (search = '', page = 1) => {
 // Obter Usuário Específico
 export const getUser = async (login) => {
   try {
-    const response = await api.get(`/users/${login}`);
+    console.log('Fetching user with login:', login); // Log para depuração
+    const response = await api.get(`/users/${login}`); // Certifique-se de que o login está sendo usado corretamente
     return response.data;
   } catch (error) {
     console.error('Get User Error:', error.response ? error.response.data : error.message);
