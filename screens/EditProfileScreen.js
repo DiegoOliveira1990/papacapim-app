@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUser, updateUser, logoutUser } from '../api';
+import { getUser, updateUser, loginUser } from '../api';
 
 export default function EditProfileScreen({ navigation }) {
   const [login, setLogin] = useState('');
@@ -16,12 +16,12 @@ export default function EditProfileScreen({ navigation }) {
         const storedUserId = await AsyncStorage.getItem('sessionId');
         if (storedUserId) {
           setUserId(storedUserId);
-          const userData = await getUser(login); // Supondo que o login esteja salvo
+          const userData = await getUser(login);
           setLogin(userData.login);
           setName(userData.name);
         }
       } catch (error) {
-        Alert.alert('Error', 'Failed to load user data.');
+        Alert.alert('Erro', 'Falha ao carregar dados do usuário.');
       }
     };
 
@@ -30,42 +30,29 @@ export default function EditProfileScreen({ navigation }) {
 
   const handleUpdateProfile = async () => {
     if (password !== passwordConfirmation) {
-      Alert.alert('Error', 'Passwords do not match!');
+      Alert.alert('Erro!', 'As senhas não coincidem!');
       return;
     }
 
     try {
-      const result = await updateUser(userId, login, name, password, passwordConfirmation);
+      // Atualizar os dados do usuário
+      await updateUser(userId, login, name, password, passwordConfirmation);
 
-      // Verificação do sessionId antes do logout
-      const sessionId = await AsyncStorage.getItem('sessionId');
-      const sessionToken = await AsyncStorage.getItem('sessionToken');
-
-      if (!sessionId || !sessionToken) {
-        Alert.alert('Session Error', 'No active session found. Please login again.');
-        navigation.navigate('Login');
-        return;
-      }
-
-      // Logar informações antes de tentar o logout
-      console.log('Attempting logout with Session ID:', sessionId);
-      console.log('Attempting logout with Session Token:', sessionToken);
-
-      // Logout após a atualização dos dados
-      await logoutUser(sessionId);
-      await AsyncStorage.removeItem('sessionId');
-      await AsyncStorage.removeItem('sessionToken');
-      Alert.alert('Profile Updated', 'Your profile has been updated successfully. Please log in again.');
-      navigation.navigate('Login');
+      Alert.alert('Perfil atualizado com sucesso! Faça o login novamente!');
+      navigation.navigate('Login'); // Redirecionar para a tela de login
     } catch (error) {
-      console.error('Logout Error:', error.response ? error.response.data : error.message);
-      Alert.alert('Logout Error', error.response?.data?.message || 'Failed to logout. Please try again.');
+      if (error.response && error.response.data.errors) {
+        const errorMessage = Object.values(error.response.data.errors).flat().join('\n');
+        Alert.alert('Update Error', errorMessage);
+      } else {
+        Alert.alert('Erro!', 'Falha ao atualizar o perfil. Tente novamente.');
+      }
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Editar Perfil</Text>
+      <Text style={styles.title}>Edital Perfil</Text>
       <TextInput
         style={styles.input}
         placeholder="Login"
@@ -82,17 +69,18 @@ export default function EditProfileScreen({ navigation }) {
         style={styles.input}
         placeholder="Nova Senha"
         value={password}
+        secureTextEntry
         onChangeText={setPassword}
       />
       <TextInput
         style={styles.input}
-        placeholder="Confirmar Senha"
+        placeholder="Confirmar Nova Senha"
         value={passwordConfirmation}
         secureTextEntry
         onChangeText={setPasswordConfirmation}
       />
       <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
-        <Text style={styles.buttonText}>Salvar Mudanças</Text>
+        <Text style={styles.buttonText}>Salvar Alterações</Text>
       </TouchableOpacity>
     </View>
   );

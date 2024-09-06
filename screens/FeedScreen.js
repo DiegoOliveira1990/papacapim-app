@@ -5,27 +5,37 @@ import { logoutUser } from '../api';
 
 export default function FeedScreen({ navigation }) {
   const [sessionId, setSessionId] = useState(null);
+  const [sessionToken, setSessionToken] = useState(null);
 
   useEffect(() => {
-    const fetchSessionId = async () => {
-      const id = await AsyncStorage.getItem('sessionId');
-      if (id) {
-        setSessionId(id);
-      } else {
-        Alert.alert('Error', 'No active session found. Please login again.');
-        navigation.navigate('Login');
+    // Carregar o sessionId e sessionToken ao carregar a tela
+    const fetchSessionData = async () => {
+      try {
+        const storedSessionId = await AsyncStorage.getItem('sessionId');
+        const storedSessionToken = await AsyncStorage.getItem('sessionToken');
+        setSessionId(storedSessionId);
+        setSessionToken(storedSessionToken);
+      } catch (error) {
+        console.error('Failed to load session data:', error);
+        Alert.alert('Error', 'Failed to load session data.');
       }
     };
 
-    fetchSessionId();
+    fetchSessionData(); // Chama a função quando a tela é carregada
   }, []);
 
   const handleLogout = async () => {
     try {
-      if (sessionId) {
+      if (sessionId && sessionToken) {
+        console.log('Attempting logout with Session ID:', sessionId);
+        console.log('Attempting logout with Session Token:', sessionToken);
+
         await logoutUser(sessionId);
+
+        // Remover sessão do AsyncStorage
         await AsyncStorage.removeItem('sessionId');
         await AsyncStorage.removeItem('sessionToken');
+
         Alert.alert('Logged out', 'You have been logged out successfully.');
         navigation.navigate('Login');
       } else {
@@ -33,7 +43,7 @@ export default function FeedScreen({ navigation }) {
       }
     } catch (error) {
       console.error('Logout Error:', error.response ? error.response.data : error.message);
-      Alert.alert('Logout Error', error.response?.data?.message || 'Failed to logout. Please try again.');
+      Alert.alert('Logout Error', 'Failed to logout. Please try again.');
     }
   };
 

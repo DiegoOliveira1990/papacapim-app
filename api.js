@@ -1,6 +1,7 @@
 // api.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Alert } from 'react-native';
 
 const api = axios.create({
   baseURL: 'https://api.papacapim.just.pro.br:8000', // URL base da API
@@ -51,12 +52,34 @@ export const loginUser = async (login, password) => {
   }
 };
 
-// Encerrar Sessão (Logout)
 export const logoutUser = async (sessionId) => {
   try {
-    await api.delete(`/sessions/${sessionId}`);
+    const token = await AsyncStorage.getItem('sessionToken');
+    console.log('Attempting logout with Session ID:', sessionId);
+    console.log('Attempting logout with Session Token:', token);
+
+    if (!sessionId) {
+      throw new Error('Session ID is missing or invalid.');
+    }
+
+    const response = await api.delete(`/sessions/${sessionId}`, {
+      headers: { 'x-session-token': token },
+    });
+
+    console.log('Logout successful:', response.data);
   } catch (error) {
-    console.error('Logout Error:', error.response ? error.response.data : error.message);
+    if (error.response) {
+      console.error('Logout Error Data:', error.response.data);
+      console.error('Logout Error Status:', error.response.status);
+      console.error('Logout Error Headers:', error.response.headers);
+      Alert.alert('Logout Error', `Failed with status ${error.response.status}`);
+    } else if (error.request) {
+      console.error('Logout Request Error:', error.request);
+      Alert.alert('Logout Error', 'No response received from server.');
+    } else {
+      console.error('Logout Unknown Error:', error.message);
+      Alert.alert('Logout Error', error.message);
+    }
     throw error;
   }
 };
