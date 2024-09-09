@@ -9,19 +9,11 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     try {
-      const result = await loginUser(login, password);
-      const sessionId = result.id; // ID da sessão retornada pelo servidor
-      const token = result.token; // Token de autenticação retornado pelo servidor
-
-      // Armazene o ID da sessão e o token no AsyncStorage
-      await AsyncStorage.setItem('sessionId', sessionId.toString());
-      await AsyncStorage.setItem('sessionToken', token);
-
-      Alert.alert('Success', 'Login successful!');
-      navigation.navigate('Feed');
+      const userData = await loginUser(login, password); // Faz o login e armazena o token
+      Alert.alert('Login bem-sucedido!', `Bem-vindo, ${userData.user_login}`);
+      navigation.navigate('Feed'); // Redireciona para o Feed
     } catch (error) {
-      console.error('Login Error:', error.response ? error.response.data : error.message);
-      Alert.alert('Error', error.response?.data?.message || 'Failed to login. Please check your credentials.');
+      Alert.alert('Erro no login', 'Verifique suas credenciais.');
     }
   };
 

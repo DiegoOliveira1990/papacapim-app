@@ -104,6 +104,10 @@ export default function FeedScreen({ navigation }) {
           <Text style={styles.buttonText}>Editar Perfil</Text>
         </TouchableOpacity>
 
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('SearchUser')}>
+          <Text style={styles.buttonText}>Buscar Usuários</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity style={styles.button} onPress={handleLogout}>
           <Text style={styles.buttonText}>Logout</Text>
         </TouchableOpacity>

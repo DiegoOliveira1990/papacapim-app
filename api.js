@@ -14,6 +14,7 @@ api.interceptors.request.use(
     const token = await AsyncStorage.getItem('sessionToken');
     if (token) {
       config.headers['x-session-token'] = token; // Adiciona o token ao cabeçalho de autenticação
+      console.log('Token enviado:', token); // Confirme o envio do token
     }
     return config;
   },
@@ -75,20 +76,10 @@ export const logoutUser = async (sessionId) => {
       headers: { 'x-session-token': token },
     });
 
+    await AsyncStorage.removeItem('sessionToken'); // Remover token após logout
     console.log('Logout successful:', response.data);
   } catch (error) {
-    if (error.response) {
-      console.error('Logout Error Data:', error.response.data);
-      console.error('Logout Error Status:', error.response.status);
-      console.error('Logout Error Headers:', error.response.headers);
-      Alert.alert('Logout Error', `Failed with status ${error.response.status}`);
-    } else if (error.request) {
-      console.error('Logout Request Error:', error.request);
-      Alert.alert('Logout Error', 'No response received from server.');
-    } else {
-      console.error('Logout Unknown Error:', error.message);
-      Alert.alert('Logout Error', error.message);
-    }
+    console.error('Logout Error:', error.response ? error.response.data : error.message);
     throw error;
   }
 };
@@ -126,14 +117,16 @@ export const deleteUser = async (userId) => {
 };
 
 // Listar Usuários
-export const listUsers = async (search = '', page = 1) => {
+export const listUsers = async (searchTerm = '') => {
   try {
     const response = await api.get('/users', {
-      params: { search, page }
+      params: { search: searchTerm.trim() }, // Apenas o termo de busca
     });
+    console.log('Status da API:', response.status);
+    console.log('Dados retornados pela API:', response.data);
     return response.data;
   } catch (error) {
-    console.error('List Users Error:', error.response ? error.response.data : error.message);
+    console.error('Erro ao listar usuários:', error.response ? error.response.data : error.message);
     throw error;
   }
 };
@@ -146,6 +139,43 @@ export const getUser = async (login) => {
     return response.data;
   } catch (error) {
     console.error('Get User Error:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para buscar usuários
+export const searchUsers = async (searchTerm, page = 1) => {
+  try {
+    console.log('Fazendo requisição para API com:', { search: searchTerm, page });
+    const response = await api.get('/users', {
+      params: { search: searchTerm, page }
+    });
+    console.log('Usuários encontrados:', response.data); // Log para verificar a resposta
+    return response.data;
+  } catch (error) {
+    console.error('Search Users Error:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para seguir usuário
+export const followUser = async (login) => {
+  try {
+    const response = await api.post(`/users/${login}/followers`);
+    return response.data;
+  } catch (error) {
+    console.error('Follow User Error:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para deixar de seguir usuário
+export const unfollowUser = async (login, followerId) => {
+  try {
+    const response = await api.delete(`/users/${login}/followers/${followerId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Unfollow User Error:', error.response ? error.response.data : error.message);
     throw error;
   }
 };

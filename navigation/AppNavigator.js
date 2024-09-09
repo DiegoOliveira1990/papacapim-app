@@ -7,6 +7,7 @@ import FeedScreen from '../screens/FeedScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import PostScreen from '../screens/PostScreen';
+import SearchUserScreen from '../screens/SearchUserScreen';
 
 const Stack = createStackNavigator();
 
@@ -20,6 +21,7 @@ export default function AppNavigator() {
         <Stack.Screen name="Profile" component={ProfileScreen} />
         <Stack.Screen name="EditProfile" component={EditProfileScreen} />
         <Stack.Screen name="Post" component={PostScreen} />
+        <Stack.Screen name="SearchUser" component={SearchUserScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
