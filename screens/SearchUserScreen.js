@@ -6,6 +6,7 @@ export default function SearchUserScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [followingStatus, setFollowingStatus] = useState({}); // Para armazenar o estado de seguir/deixar de seguir para cada usuário
 
   // Função para buscar usuários
   const handleSearch = async () => {
@@ -36,38 +37,67 @@ export default function SearchUserScreen() {
 
   // Função para seguir usuário
   const handleFollow = async (login) => {
+    if (followingStatus[login]) {
+      // Se o usuário já estiver sendo seguido, não tente segui-lo novamente
+      Alert.alert('Atenção', `Você já está seguindo ${login}.`);
+      return;
+    }
     try {
-      await followUser(login);
+      await followUser(login);  // Chamada da API para seguir
       Alert.alert('Sucesso', `Agora você está seguindo ${login}`);
+      setFollowingStatus((prevState) => ({
+        ...prevState,
+        [login]: true, // Marca o usuário como seguido
+      }));
     } catch (error) {
-      Alert.alert('Erro', 'Falha ao seguir o usuário.');
+      if (error.response && error.response.data.followed_id && error.response.data.followed_id[0] === "has already been taken") {
+        // Se o erro for "has already been taken", significa que o usuário já está sendo seguido
+        Alert.alert('Atenção', `Você já está seguindo ${login}.`);
+        setFollowingStatus((prevState) => ({
+          ...prevState,
+          [login]: true, // Atualiza o estado para refletir que o usuário já está sendo seguido
+        }));
+      } else {
+        Alert.alert('Erro', 'Falha ao seguir o usuário.');
+      }
     }
   };
 
   // Função para deixar de seguir usuário
-  const handleUnfollow = async (login, followerId) => {
+  const handleUnfollow = async (login) => {
     try {
-      await unfollowUser(login, followerId);
+      await unfollowUser(login);  // Chamada da API para deixar de seguir
       Alert.alert('Sucesso', `Você deixou de seguir ${login}`);
+      setFollowingStatus((prevState) => ({
+        ...prevState,
+        [login]: false // Marca o usuário como não seguido
+      }));
     } catch (error) {
       Alert.alert('Erro', 'Falha ao deixar de seguir o usuário.');
     }
   };
 
-  // Renderizar cada usuário
+  // Renderização de cada usuário
   const renderUser = ({ item }) => (
     <View style={styles.userContainer}>
       <Text style={styles.userName}>{item.name}</Text>
       <Text style={styles.userLogin}>{item.login}</Text>
-      <TouchableOpacity style={styles.followButton} onPress={() => handleFollow(item.login)}>
-        <Text style={styles.followButtonText}>Seguir</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.unfollowButton} onPress={() => handleUnfollow(item.login, item.followerId)}>
-        <Text style={styles.unfollowButtonText}>Deixar de Seguir</Text>
-      </TouchableOpacity>
+
+      {followingStatus[item.login] ? (
+        <TouchableOpacity
+          style={styles.unfollowButton}
+          onPress={() => handleUnfollow(item.login)}>
+          <Text style={styles.unfollowButtonText}>Deixar de Seguir</Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={styles.followButton}
+          onPress={() => handleFollow(item.login)}>
+          <Text style={styles.followButtonText}>Seguir</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
-
   return (
     <View style={styles.container}>
       <TextInput
@@ -76,19 +106,15 @@ export default function SearchUserScreen() {
         value={searchTerm}
         onChangeText={setSearchTerm}
       />
-      <TouchableOpacity style={styles.searchButton} onPress={handleSearch} disabled={loading}>
-        <Text style={styles.searchButtonText}>{loading ? 'Buscando...' : 'Buscar'}</Text>
+      <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+        <Text style={styles.searchButtonText}>Buscar</Text>
       </TouchableOpacity>
 
-      {!loading && (
-        <FlatList
-          data={users}
-          keyExtractor={(item) => item.login} // Use 'login' como chave única
-          renderItem={renderUser}
-        />
-      )}
-
-      {loading && <Text>Carregando...</Text>}
+      <FlatList
+        data={users}
+        keyExtractor={(item) => item.login}
+        renderItem={renderUser}
+      />
     </View>
   );
 }
