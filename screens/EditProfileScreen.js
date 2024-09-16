@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getUser, updateUser, loginUser } from '../api';
+import { getUser, updateUser, deleteUser } from '../api'; // Importe a função deleteUser
 
 export default function EditProfileScreen({ navigation }) {
   const [login, setLogin] = useState('');
@@ -14,11 +14,12 @@ export default function EditProfileScreen({ navigation }) {
     const loadUserData = async () => {
       try {
         const storedUserId = await AsyncStorage.getItem('sessionId');
-        if (storedUserId) {
+        const storedLogin = await AsyncStorage.getItem('userLogin'); // Carregar o login armazenado
+        if (storedUserId && storedLogin) {
           setUserId(storedUserId);
-          const userData = await getUser(login);
-          setLogin(userData.login);
-          setName(userData.name);
+          setLogin(storedLogin); // Define o login do usuário logado
+          const userData = await getUser(storedLogin); // Chama a função getUser com o login correto
+          setName(userData.name); // Define o nome recebido da API
         }
       } catch (error) {
         Alert.alert('Erro', 'Falha ao carregar dados do usuário.');
@@ -50,9 +51,40 @@ export default function EditProfileScreen({ navigation }) {
     }
   };
 
+  const confirmDeleteAccount = () => {
+    Alert.alert(
+      'Confirmação',
+      'Tem certeza que deseja excluir? Essa ação não pode ser desfeita.',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel', // Botão de cancelar
+        },
+        {
+          text: 'Excluir',
+          onPress: handleDeleteAccount, // Função que será chamada ao confirmar a exclusão
+          style: 'destructive', // Estilo destrutivo para destacar que é uma ação perigosa
+        },
+      ]
+    );
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      console.log('Deleting user with ID:', userId); // Log do ID para exclusão
+      await deleteUser(userId); // Chama a função para deletar o usuário
+      await AsyncStorage.clear(); // Limpa os dados da sessão
+      Alert.alert('Conta excluída com sucesso');
+      navigation.navigate('Login'); // Redireciona para a tela de cadastro
+    } catch (error) {
+      console.error('Delete User Error:', error.response ? error.response.data : error.message); // Log detalhado do erro
+      Alert.alert('Erro!', 'Falha ao excluir a conta. Tente novamente.');
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Edital Perfil</Text>
+      <Text style={styles.title}>Editar Perfil</Text>
       <TextInput
         style={styles.input}
         placeholder="Login"
@@ -81,6 +113,11 @@ export default function EditProfileScreen({ navigation }) {
       />
       <TouchableOpacity style={styles.button} onPress={handleUpdateProfile}>
         <Text style={styles.buttonText}>Salvar Alterações</Text>
+      </TouchableOpacity>
+
+      {/* Botão para excluir conta */}
+      <TouchableOpacity style={[styles.button, styles.deleteButton]} onPress={confirmDeleteAccount}>
+        <Text style={styles.buttonText}>Excluir Conta</Text>
       </TouchableOpacity>
     </View>
   );
@@ -115,5 +152,8 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontSize: 18,
+  },
+  deleteButton: {
+    backgroundColor: 'red', // Botão de exclusão com cor diferenciada
   },
 });

@@ -138,8 +138,8 @@ export const getUser = async (login) => {
     const response = await api.get(`/users/${login}`); // Certifique-se de que o login está sendo usado corretamente
     return response.data;
   } catch (error) {
-    console.error('Get User Error:', error.response ? error.response.data : error.message);
-    throw error;
+    console.error('Get User Error:', error.response ? error.response.data : error.message); // Mostra detalhes do erro
+    throw error; // Repassa o erro para ser tratado na tela
   }
 };
 
