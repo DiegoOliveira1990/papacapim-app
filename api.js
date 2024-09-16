@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 
 const api = axios.create({
-  baseURL: 'https://api.papacapim.just.pro.br:8000', // URL base da API
+  baseURL: 'https://api.papacapim.just.pro.br', // URL base da API
   timeout: 5000,
 });
 
