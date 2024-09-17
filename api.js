@@ -162,6 +162,7 @@ export const searchUsers = async (searchTerm, page = 1) => {
 export const followUser = async (login) => {
   try {
     const response = await api.post(`/users/${login}/followers`);
+    console.log('Follow User Response:', response.data); // Log da resposta
     return response.data;
   } catch (error) {
     console.error('Follow User Error:', error.response ? error.response.data : error.message);
@@ -173,9 +174,22 @@ export const followUser = async (login) => {
 export const unfollowUser = async (login, followerId) => {
   try {
     const response = await api.delete(`/users/${login}/followers/${followerId}`);
+    console.log('Unfollow User Response:', response.data); // Log para verificar a resposta
     return response.data;
   } catch (error) {
     console.error('Unfollow User Error:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para listar seguidores de um usuário
+export const listFollowers = async (login) => {
+  try {
+    const response = await api.get(`/users/${login}/followers`);
+    console.log('Followers Response:', response.data); // Log para verificar a resposta
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao listar seguidores:', error.response ? error.response.data : error.message);
     throw error;
   }
 };

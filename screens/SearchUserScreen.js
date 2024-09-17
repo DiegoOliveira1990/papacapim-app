@@ -1,12 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, Alert, StyleSheet } from 'react-native';
-import { listUsers, followUser, unfollowUser } from '../api';
+import { listUsers, followUser, unfollowUser, listFollowers } from '../api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SearchUserScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [followingStatus, setFollowingStatus] = useState({}); // Para armazenar o estado de seguir/deixar de seguir para cada usuário
+
+  // Função para verificar se o usuário está sendo seguido
+  const checkIfFollowing = async (login) => {
+    try {
+      const followers = await listFollowers(login);
+      const currentUserLogin = await AsyncStorage.getItem('userLogin');
+      if (followers.length === 0) {
+        return false;
+      }
+      return followers.some(follower => follower.follower_login === currentUserLogin);
+    } catch (error) {
+      if (error.response && error.response.status === 404) {
+        return false; // Trata o caso de login inválido ou sem seguidores
+      }
+      console.error('Erro ao verificar se está seguindo:', error);
+      return false;
+    }
+  };
 
   // Função para buscar usuários
   const handleSearch = async () => {
@@ -17,14 +36,16 @@ export default function SearchUserScreen() {
 
     setLoading(true);
     try {
-      console.log('Termo de busca enviado (formatado):', searchTerm);
       const usersFound = await listUsers(searchTerm);
-
-      if (Array.isArray(usersFound) && usersFound.length > 0) {
-        console.log('Usuários encontrados:', usersFound);
-        setUsers(usersFound);
+      if (usersFound.length > 0) {
+        const updatedUsers = await Promise.all(
+          usersFound.map(async (user) => {
+            const isFollowing = await checkIfFollowing(user.login); // Verifica se o usuário já está sendo seguido
+            return { ...user, isFollowing };
+          })
+        );
+        setUsers(updatedUsers);
       } else {
-        console.warn('Nenhum usuário encontrado.');
         Alert.alert('Nenhum usuário encontrado.');
       }
     } catch (error) {
@@ -37,67 +58,81 @@ export default function SearchUserScreen() {
 
   // Função para seguir usuário
   const handleFollow = async (login) => {
-    if (followingStatus[login]) {
-      // Se o usuário já estiver sendo seguido, não tente segui-lo novamente
-      Alert.alert('Atenção', `Você já está seguindo ${login}.`);
-      return;
-    }
     try {
-      await followUser(login);  // Chamada da API para seguir
+      const followData = await followUser(login); // Chamada da API para seguir
+      setUsers((prevUsers) =>
+        prevUsers.map(user =>
+          user.login === login ? { ...user, isFollowing: true } : user
+        )
+      );
       Alert.alert('Sucesso', `Agora você está seguindo ${login}`);
-      setFollowingStatus((prevState) => ({
-        ...prevState,
-        [login]: true, // Marca o usuário como seguido
-      }));
     } catch (error) {
-      if (error.response && error.response.data.followed_id && error.response.data.followed_id[0] === "has already been taken") {
-        // Se o erro for "has already been taken", significa que o usuário já está sendo seguido
-        Alert.alert('Atenção', `Você já está seguindo ${login}.`);
-        setFollowingStatus((prevState) => ({
-          ...prevState,
-          [login]: true, // Atualiza o estado para refletir que o usuário já está sendo seguido
-        }));
-      } else {
-        Alert.alert('Erro', 'Falha ao seguir o usuário.');
-      }
+      console.error('Erro ao seguir usuário:', error);
+      Alert.alert('Erro', 'Falha ao seguir o usuário.');
     }
   };
 
   // Função para deixar de seguir usuário
   const handleUnfollow = async (login) => {
     try {
-      await unfollowUser(login);  // Chamada da API para deixar de seguir
-      Alert.alert('Sucesso', `Você deixou de seguir ${login}`);
-      setFollowingStatus((prevState) => ({
-        ...prevState,
-        [login]: false // Marca o usuário como não seguido
-      }));
+      const followers = await listFollowers(login);
+      const currentUserLogin = await AsyncStorage.getItem('userLogin');
+      
+      // Encontrar o seguidor correspondente ao usuário logado
+      const followerData = followers.find(follower => follower.follower_login === currentUserLogin);
+      
+      if (followerData && followerData.follower_id) {
+        console.log(`ID do seguidor para deixar de seguir: ${followerData.follower_id}`);
+  
+        // Chamada para a API com o ID do seguidor correto
+        await unfollowUser(login, followerData.follower_id);
+        
+        // Atualizar o estado dos usuários
+        setUsers((prevUsers) =>
+          prevUsers.map(user =>
+            user.login === login ? { ...user, isFollowing: false } : user
+          )
+        );
+  
+        Alert.alert('Sucesso', `Você deixou de seguir ${login}`);
+      } else {
+        Alert.alert('Erro', 'Não foi possível encontrar o ID do seguidor.');
+      }
     } catch (error) {
+      console.error('Erro ao deixar de seguir usuário:', error);
       Alert.alert('Erro', 'Falha ao deixar de seguir o usuário.');
     }
   };
+  
 
-  // Renderização de cada usuário
+  // Renderização de cada usuário com ambos botões
   const renderUser = ({ item }) => (
     <View style={styles.userContainer}>
       <Text style={styles.userName}>{item.name}</Text>
       <Text style={styles.userLogin}>{item.login}</Text>
-
-      {followingStatus[item.login] ? (
+  
+      <View style={styles.buttonContainer}>
+        {/* Botão de Seguir */}
         <TouchableOpacity
-          style={styles.unfollowButton}
-          onPress={() => handleUnfollow(item.login)}>
-          <Text style={styles.unfollowButtonText}>Deixar de Seguir</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={styles.followButton}
-          onPress={() => handleFollow(item.login)}>
+          style={[styles.followButton, { backgroundColor: !item.isFollowing ? '#28a745' : '#d3d3d3' }]}
+          onPress={() => !item.isFollowing ? handleFollow(item.login) : null} // Torna inclicável
+          disabled={item.isFollowing} // Desativa o botão se o usuário já estiver sendo seguido
+        >
           <Text style={styles.followButtonText}>Seguir</Text>
         </TouchableOpacity>
-      )}
+  
+        {/* Botão de Deixar de Seguir */}
+        <TouchableOpacity
+          style={[styles.unfollowButton, { backgroundColor: item.isFollowing ? '#dc3545' : '#d3d3d3' }]}
+          onPress={() => item.isFollowing ? handleUnfollow(item.login) : null} // Torna inclicável
+          disabled={!item.isFollowing} // Desativa o botão se o usuário não estiver sendo seguido
+        >
+          <Text style={styles.unfollowButtonText}>Deixar de Seguir</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
+
   return (
     <View style={styles.container}>
       <TextInput
@@ -156,24 +191,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'gray',
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
   followButton: {
-    backgroundColor: '#28a745',
     padding: 10,
     borderRadius: 5,
-    marginTop: 10,
     alignItems: 'center',
+    marginRight: 10,
+    flex: 1,
   },
   followButtonText: {
     color: '#fff',
   },
   unfollowButton: {
-    backgroundColor: '#dc3545',
     padding: 10,
     borderRadius: 5,
-    marginTop: 10,
     alignItems: 'center',
+    flex: 1,
   },
   unfollowButtonText: {
     color: '#fff',
   },
 });
+
+
+
