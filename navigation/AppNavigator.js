@@ -9,6 +9,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import EditProfileScreen from '../screens/EditProfileScreen';
 import PostScreen from '../screens/PostScreen';
 import SearchUserScreen from '../screens/SearchUserScreen';
+import PostReplyScreen from '../screens/PostReply';
 
 const Stack = createStackNavigator();
 
@@ -25,6 +26,7 @@ export default function AppNavigator() {
           <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Post" component={PostScreen} options={{ headerShown: false }} />
           <Stack.Screen name="SearchUser" component={SearchUserScreen} options={{ headerShown: false }} />
+          <Stack.Screen name="PostReply" component={PostReplyScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </SafeAreaView>
     </NavigationContainer>

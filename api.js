@@ -193,3 +193,116 @@ export const listFollowers = async (login) => {
     throw error;
   }
 };
+
+// Função para buscar postagens do feed
+export const getFeedPosts = async () => {
+  try {
+    const response = await api.get('/posts');
+    console.log('Feed posts response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao obter postagens do feed:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para buscar o feed
+export const fetchFeed = async () => {
+  try {
+    const response = await api.get('/posts'); // Endpoint que retorna o feed
+    console.log('Feed carregado com sucesso:', response.data); // Log para verificar a resposta
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao carregar o feed:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+
+// Função para criar uma nova postagem
+export const createPost = async (message) => {
+  try {
+    const response = await api.post('/posts', {
+      post: {
+        message,
+      },
+    });
+    console.log('Post criado com sucesso:', response.data); // Log da resposta
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao criar a postagem:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para deletar uma postagem
+export const deletePost = async (postId) => {
+  try {
+    const response = await api.delete(`/posts/${postId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Delete Post Error:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para responder a uma postagem
+export const replyToPost = async (postId, message) => {
+  try {
+    const response = await api.post(`/posts/${postId}/replies`, {
+      reply: {
+        message,
+      },
+    });
+    console.log('Reply to post response:', response.data); // Log da resposta
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao responder a postagem:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Função para obter as respostas de uma postagem
+export const getRepliesForPost = async (postId) => {
+  try {
+    const response = await api.get(`/posts/${postId}/replies`);
+    console.log('Replies Response:', response.data);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao obter respostas da postagem:', error.response ? error.response.data : error.message);
+    throw error;
+  }
+};
+
+// Curtir postagem
+export const likePost = async (postId) => {
+  try {
+    const response = await api.post(`/posts/${postId}/likes`);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao curtir postagem:', error);
+    throw error;
+  }
+};
+
+// Descurtir postagem
+export const unlikePost = async (postId, likeId) => {
+  try {
+    const response = await api.delete(`/posts/${postId}/likes/${likeId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao descurtir postagem:', error);
+    throw error;
+  }
+};
+
+// Buscar postagens
+export const searchPosts = async (searchTerm) => {
+  try {
+    const response = await api.get('/posts', { params: { search: searchTerm } });
+    return response.data;
+  } catch (error) {
+    console.error('Erro ao buscar postagens:', error);
+    throw error;
+  }
+};

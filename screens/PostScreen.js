@@ -1,8 +1,33 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { createPost } from '../api'; // Certifique-se de que essa função está implementada
 
-export default function PostScreen({ navigation }) {
+export default function PostScreen({ navigation, route }) {
   const [postContent, setPostContent] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handlePost = async () => {
+    if (!postContent.trim()) {
+      Alert.alert('Erro', 'O conteúdo da postagem não pode estar vazio.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await createPost(postContent); // Envia o conteúdo da postagem para a API
+      setLoading(false);
+      if (route.params?.refreshFeed) {
+        route.params.refreshFeed(); // Chama a função de atualizar o feed passado como parâmetro
+      }
+      Alert.alert('Sucesso', 'Postagem criada com sucesso.');
+      navigation.goBack(); // Volta para a tela de feed
+    } catch (error) {
+      setLoading(false);
+      console.error('Erro ao criar a postagem:', error);
+      Alert.alert('Erro', 'Falha ao criar a postagem. Tente novamente.');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -14,12 +39,8 @@ export default function PostScreen({ navigation }) {
         onChangeText={setPostContent}
         multiline
       />
-      <TouchableOpacity style={styles.button} onPress={() => {
-        // Aqui você pode adicionar a lógica para enviar o post para a API ou simular a postagem
-        // Por enquanto, vamos apenas voltar para a tela de feed
-        navigation.goBack();
-      }}>
-        <Text style={styles.buttonText}>Postar</Text>
+      <TouchableOpacity style={styles.button} onPress={handlePost} disabled={loading}>
+        <Text style={styles.buttonText}>{loading ? 'Postando...' : 'Postar'}</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.button} onPress={() => navigation.goBack()}>
         <Text style={styles.buttonText}>Cancelar</Text>
