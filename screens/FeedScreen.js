@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { getFeedPosts, searchPosts, logoutUser } from '../api';
+import { getFeedPosts, searchPosts, deletePost, likePost, unlikePost, getLikesForPost, logoutUser } from '../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FontAwesome } from '@expo/vector-icons';
 
@@ -10,15 +10,24 @@ export default function FeedScreen({ navigation }) {
   const [searchTerm, setSearchTerm] = useState(''); // Estado para armazenar o termo de busca
   const [menuOpen, setMenuOpen] = useState(false); // Estado para controlar a abertura do menu
   const [userLogin, setUserLogin] = useState(null); // Estado para armazenar o login do usuário
+  const [likesState, setLikesState] = useState({}); // Estado para armazenar curtidas por post
   const [isSearchActive, setIsSearchActive] = useState(false); // Estado para controlar se a busca está ativa
 
-  // Função para carregar postagens do feed
-  const loadFeed = async () => {
+  // Função para carregar postagens do feed e verificar curtidas
+  const loadFeed = async (user) => {
     try {
       console.log('Carregando postagens do feed...');
       const feedPosts = await getFeedPosts(); // Chama a API para buscar as postagens
       console.log('Postagens recebidas:', feedPosts);
+
       if (feedPosts.length > 0) {
+        const likesMap = {};
+        // Verifica as curtidas para cada postagem
+        for (let post of feedPosts) {
+          const likes = await getLikesForPost(post.id);
+          likesMap[post.id] = likes.some((like) => like.user_login === user); // Define se o post está curtido
+        }
+        setLikesState(likesMap); // Armazena o estado de curtidas
         setPosts(feedPosts); // Atualiza o estado com as postagens
       } else {
         Alert.alert('Aviso', 'Nenhuma postagem disponível.');
@@ -29,6 +38,54 @@ export default function FeedScreen({ navigation }) {
     } finally {
       setLoading(false); // Para de exibir o indicador de carregamento
     }
+  };
+
+  // Função para curtir ou descurtir uma postagem
+  const handleLikeOrUnlikePost = async (postId) => {
+    try {
+      if (likesState[postId]) {
+        // Se já curtiu, descurtir
+        const likes = await getLikesForPost(postId);
+        const userLike = likes.find((like) => like.user_login === userLogin);
+        if (userLike) {
+          await unlikePost(postId, userLike.id);
+          setLikesState((prevState) => ({ ...prevState, [postId]: false })); // Atualiza estado para descurtido
+        }
+      } else {
+        // Se não curtiu, curtir
+        await likePost(postId);
+        setLikesState((prevState) => ({ ...prevState, [postId]: true })); // Atualiza estado para curtido
+      }
+    } catch (error) {
+      console.error('Erro ao curtir/descurtir postagem:', error.response?.data || error.message);
+      Alert.alert('Erro', 'Falha ao curtir/descurtir a postagem.');
+    }
+  };
+
+  // Função para deletar postagem
+  const handleDeletePost = async (postId) => {
+    Alert.alert(
+      'Confirmação',
+      'Você tem certeza que deseja deletar esta postagem?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Deletar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deletePost(postId); // Chama a API para deletar a postagem
+              setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId)); // Atualiza o estado do feed
+              Alert.alert('Sucesso', 'Postagem deletada com sucesso.');
+            } catch (error) {
+              console.error('Erro ao deletar postagem:', error);
+              Alert.alert('Erro', 'Falha ao deletar a postagem.');
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   // Função para buscar postagens pelo termo de pesquisa
@@ -61,7 +118,7 @@ export default function FeedScreen({ navigation }) {
   const handleBackToFeed = () => {
     setSearchTerm('');
     setIsSearchActive(false);
-    loadFeed(); // Carrega o feed original
+    loadFeed(userLogin); // Carrega o feed original
   };
 
   // Carrega as postagens ao montar o componente
@@ -69,9 +126,11 @@ export default function FeedScreen({ navigation }) {
     const fetchUserLogin = async () => {
       const storedUserLogin = await AsyncStorage.getItem('userLogin'); // Obtenha o login do usuário atual
       setUserLogin(storedUserLogin);
+      if (storedUserLogin) {
+        await loadFeed(storedUserLogin); // Carrega o feed para o usuário logado
+      }
     };
     fetchUserLogin();
-    loadFeed();
   }, []);
 
   // Função de logout
@@ -90,12 +149,31 @@ export default function FeedScreen({ navigation }) {
   // Renderização de cada item (post) da lista
   const renderItem = ({ item }) => (
     <View style={styles.postContainer}>
-      <Text style={styles.postUserName}>
-        {item.user_login ? item.user_login : 'Usuário Desconhecido'}
-      </Text> 
-      <Text style={styles.postText}>
-        {item.message}
-      </Text>
+      <View style={styles.postContent}>
+        <Text style={styles.postUserName}>
+          {item.user_login ? item.user_login : 'Usuário Desconhecido'}
+        </Text>
+        <Text style={styles.postText}>
+          {item.message}
+        </Text>
+      </View>
+      <View style={styles.actions}>
+        {item.user_login === userLogin && (
+          <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeletePost(item.id)}>
+            <FontAwesome name="trash" size={20} color="#fff" />
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={styles.likeButton}
+          onPress={() => handleLikeOrUnlikePost(item.id)}
+        >
+          <FontAwesome
+            name={likesState[item.id] ? "thumbs-up" : "thumbs-o-up"} // Muda o ícone conforme curtido ou não
+            size={20}
+            color={likesState[item.id] ? '#00ff00' : '#ccc'} // Verde se curtido, cinza se não curtido
+          />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -185,11 +263,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
-  postUserName: { // Estilo para o nome do usuário
+  postContent: {
+    flex: 1,
+  },
+  postUserName: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#007bff',
@@ -197,6 +281,22 @@ const styles = StyleSheet.create({
   },
   postText: {
     fontSize: 16,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    backgroundColor: '#ff4d4d',
+    padding: 5,
+    borderRadius: 5,
+    marginLeft: 10,
+  },
+  likeButton: {
+    backgroundColor: '#007bff',
+    padding: 5,
+    borderRadius: 5,
+    marginLeft: 10,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -244,7 +344,7 @@ const styles = StyleSheet.create({
   },
   menu: {
     position: 'absolute',
-    bottom: 80, // Move o menu para cima quando aberto
+    bottom: 80,
     right: 0,
     alignItems: 'center',
   },

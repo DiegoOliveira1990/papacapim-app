@@ -278,9 +278,10 @@ export const getRepliesForPost = async (postId) => {
 export const likePost = async (postId) => {
   try {
     const response = await api.post(`/posts/${postId}/likes`);
+    console.log('Resposta da API ao curtir:', response.data); // Adicione este log
     return response.data;
   } catch (error) {
-    console.error('Erro ao curtir postagem:', error);
+    console.error('Erro ao curtir postagem:', error.response ? error.response.data : error.message);
     throw error;
   }
 };
@@ -289,12 +290,14 @@ export const likePost = async (postId) => {
 export const unlikePost = async (postId, likeId) => {
   try {
     const response = await api.delete(`/posts/${postId}/likes/${likeId}`);
+    console.log('Resposta da API ao descurtir:', response.data); // Adicione este log
     return response.data;
   } catch (error) {
-    console.error('Erro ao descurtir postagem:', error);
+    console.error('Erro ao descurtir postagem:', error.response ? error.response.data : error.message);
     throw error;
   }
 };
+
 
 // Buscar postagens
 export const searchPosts = async (searchTerm) => {
@@ -306,5 +309,17 @@ export const searchPosts = async (searchTerm) => {
     throw error;
   }
 };
+
+// Função para listar curtidas de uma postagem
+export const getLikesForPost = async (postId) => {
+  try {
+    const response = await api.get(`/posts/${postId}/likes`);
+    return response.data; // Retorna as curtidas da postagem
+  } catch (error) {
+    console.error('Erro ao obter curtidas da postagem:', error);
+    throw error;
+  }
+};
+
 
 
