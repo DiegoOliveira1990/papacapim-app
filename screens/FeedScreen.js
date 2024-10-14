@@ -1,122 +1,101 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { getFeedPosts, searchPosts, logoutUser } from '../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getFeedPosts, logoutUser, deletePost, getRepliesForPost } from '../api'; // Adicionar getRepliesForPost
+import { FontAwesome } from '@expo/vector-icons';
 
 export default function FeedScreen({ navigation }) {
-  const [sessionId, setSessionId] = useState(null);
-  const [sessionToken, setSessionToken] = useState(null);
-  const [userLogin, setUserLogin] = useState(null);
-  const [posts, setPosts] = useState([]); // Estado para as postagens do feed
-  const [loading, setLoading] = useState(true); // Estado para carregar o feed
+  const [posts, setPosts] = useState([]); // Estado para armazenar postagens
+  const [loading, setLoading] = useState(true); // Estado para indicar o carregamento do feed
+  const [searchTerm, setSearchTerm] = useState(''); // Estado para armazenar o termo de busca
+  const [menuOpen, setMenuOpen] = useState(false); // Estado para controlar a abertura do menu
+  const [userLogin, setUserLogin] = useState(null); // Estado para armazenar o login do usuário
+  const [isSearchActive, setIsSearchActive] = useState(false); // Estado para controlar se a busca está ativa
 
-  useEffect(() => {
-    const fetchSessionData = async () => {
-      try {
-        const storedSessionId = await AsyncStorage.getItem('sessionId');
-        const storedSessionToken = await AsyncStorage.getItem('sessionToken');
-        const storedUserLogin = await AsyncStorage.getItem('userLogin');
-        setSessionId(storedSessionId);
-        setSessionToken(storedSessionToken);
-        setUserLogin(storedUserLogin);
-
-        // Carregar o feed de postagens e suas respostas
-        const feedPosts = await getFeedPosts();
-        const postsWithReplies = await Promise.all(
-          feedPosts.map(async (post) => {
-            const replies = await getRepliesForPost(post.id);
-            return { ...post, replies };
-          })
-        );
-        setPosts(postsWithReplies); // Atualiza com as respostas
-      } catch (error) {
-        console.error('Failed to load session or feed data:', error);
-        Alert.alert('Error', 'Failed to load session or feed data.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSessionData();
-  }, []);
-
-  const handleLogout = async () => {
+  // Função para carregar postagens do feed
+  const loadFeed = async () => {
     try {
-      if (sessionId && sessionToken) {
-        await logoutUser(sessionId);
-        await AsyncStorage.removeItem('sessionId');
-        await AsyncStorage.removeItem('sessionToken');
-        await AsyncStorage.removeItem('userLogin');
-        Alert.alert('Logged out', 'You have been logged out successfully.');
-        navigation.navigate('Login');
+      console.log('Carregando postagens do feed...');
+      const feedPosts = await getFeedPosts(); // Chama a API para buscar as postagens
+      console.log('Postagens recebidas:', feedPosts);
+      if (feedPosts.length > 0) {
+        setPosts(feedPosts); // Atualiza o estado com as postagens
       } else {
-        Alert.alert('Error', 'No active session found.');
+        Alert.alert('Aviso', 'Nenhuma postagem disponível.');
       }
     } catch (error) {
-      console.error('Logout Error:', error.response ? error.response.data : error.message);
-      Alert.alert('Logout Error', 'Failed to logout. Please try again.');
+      console.error('Erro ao carregar o feed:', error);
+      Alert.alert('Erro', 'Falha ao carregar as postagens.');
+    } finally {
+      setLoading(false); // Para de exibir o indicador de carregamento
     }
   };
 
-  const handleDeletePost = async (postId) => {
-    Alert.alert(
-      'Confirmação',
-      'Você tem certeza que deseja deletar esta postagem?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Deletar',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deletePost(postId);
-              setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
-              Alert.alert('Sucesso', 'Postagem deletada com sucesso.');
-            } catch (error) {
-              console.error('Erro ao deletar postagem:', error);
-              Alert.alert('Erro', 'Falha ao deletar a postagem.');
-            }
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+  // Função para buscar postagens pelo termo de pesquisa
+  const handleSearch = async () => {
+    if (!searchTerm.trim()) {
+      Alert.alert('Erro', 'Por favor, insira um termo de busca.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const searchResults = await searchPosts(searchTerm); // Chama a função de busca da API
+      console.log('Resultados da busca:', searchResults);
+      if (searchResults.length > 0) {
+        setPosts(searchResults); // Atualiza o estado com os resultados da busca
+        setIsSearchActive(true); // Define a busca como ativa
+      } else {
+        Alert.alert('Nenhuma postagem encontrada.');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar postagens:', error);
+      Alert.alert('Erro', 'Falha ao buscar postagens.');
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Função para voltar ao feed após a busca
+  const handleBackToFeed = () => {
+    setSearchTerm('');
+    setIsSearchActive(false);
+    loadFeed(); // Carrega o feed original
+  };
+
+  // Carrega as postagens ao montar o componente
+  useEffect(() => {
+    const fetchUserLogin = async () => {
+      const storedUserLogin = await AsyncStorage.getItem('userLogin'); // Obtenha o login do usuário atual
+      setUserLogin(storedUserLogin);
+    };
+    fetchUserLogin();
+    loadFeed();
+  }, []);
+
+  // Função de logout
+  const handleLogout = async () => {
+    const sessionId = await AsyncStorage.getItem('sessionId');
+    try {
+      await logoutUser(sessionId);
+      await AsyncStorage.clear(); // Limpar dados armazenados localmente
+      navigation.navigate('Login');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      Alert.alert('Erro', 'Falha ao fazer logout.');
+    }
+  };
+
+  // Renderização de cada item (post) da lista
   const renderItem = ({ item }) => (
     <View style={styles.postContainer}>
-      <TouchableOpacity onPress={() => navigation.navigate('Profile', { userId: item.user_login })}>
-        <Image source={{ uri: `https://api.papacapim.just.pro.br/avatars/${item.user_login}.png` }} style={styles.avatar} />
-      </TouchableOpacity>
-      <View style={styles.postContent}>
-        <Text style={styles.userName}>{item.user_login}</Text>
-        <Text style={styles.postText}>{item.message}</Text>
-
-        {/* Botões de curtir, responder e deletar */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('PostReply', { postId: item.id })}>
-            <Text style={styles.actionText}>Responder</Text>
-          </TouchableOpacity>
-          {item.user_login === userLogin && (
-            <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeletePost(item.id)}>
-              <Text style={styles.deleteButtonText}>Deletar</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Exibe respostas da postagem */}
-        {item.replies && item.replies.length > 0 && (
-          <View style={styles.repliesContainer}>
-            <Text style={styles.repliesTitle}>Respostas:</Text>
-            {item.replies.map((reply) => (
-              <View key={reply.id} style={styles.reply}>
-                <Text style={styles.replyUser}>{reply.user_login}</Text>
-                <Text style={styles.replyText}>{reply.message}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
+      <Text style={styles.postUserName}>
+        {item.user_login ? item.user_login : 'Usuário Desconhecido'}
+      </Text> 
+      <Text style={styles.postText}>
+        {item.message}
+      </Text>
     </View>
   );
 
@@ -130,31 +109,65 @@ export default function FeedScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      {/* Campo de busca */}
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Pesquisar postagens..."
+          value={searchTerm}
+          onChangeText={setSearchTerm}
+        />
+        <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+          <FontAwesome name="search" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Lista de postagens */}
       <FlatList
         data={posts}
         renderItem={renderItem}
         keyExtractor={(item) => item.id.toString()}
       />
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Post')}>
-          <Text style={styles.buttonText}>Novo Post</Text>
+
+      {/* Botão de Voltar ao Feed */}
+      {isSearchActive && (
+        <TouchableOpacity style={styles.backToFeedButton} onPress={handleBackToFeed}>
+          <Text style={styles.backToFeedButtonText}>Voltar ao Feed</Text>
+        </TouchableOpacity>
+      )}
+
+      {/* Menu Expansível */}
+      <View style={styles.menuContainer}>
+        {/* Botão principal do menu */}
+        <TouchableOpacity style={styles.menuButtonMain} onPress={() => setMenuOpen(!menuOpen)}>
+          <FontAwesome name={menuOpen ? "times" : "bars"} size={24} color="#fff" />
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Profile', { login: userLogin })}>
-          <Text style={styles.buttonText}>Perfil</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('EditProfile')}>
-          <Text style={styles.buttonText}>Editar Perfil</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('SearchUser')}>
-          <Text style={styles.buttonText}>Buscar Usuários</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.button} onPress={handleLogout}>
-          <Text style={styles.buttonText}>Logout</Text>
-        </TouchableOpacity>
+        {/* Menu de Ações */}
+        {menuOpen && (
+          <View style={styles.menu}>
+            <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Post')}>
+              <FontAwesome name="pencil" size={24} color="#fff" />
+              <Text style={styles.menuButtonText}>Novo Post</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Profile', { login: userLogin })}>
+              <FontAwesome name="user" size={24} color="#fff" />
+              <Text style={styles.menuButtonText}>Perfil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('EditProfile')}>
+              <FontAwesome name="edit" size={24} color="#fff" />
+              <Text style={styles.menuButtonText}>Editar Perfil</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('SearchUser')}>
+              <FontAwesome name="search" size={24} color="#fff" />
+              <Text style={styles.menuButtonText}>Buscar Usuários</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.menuButton} onPress={handleLogout}>
+              <FontAwesome name="sign-out" size={24} color="#fff" />
+              <Text style={styles.menuButtonText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -172,82 +185,83 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postContainer: {
-    flexDirection: 'row',
-    marginBottom: 20,
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ccc',
   },
-  avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 10,
-  },
-  postContent: {
-    flex: 1,
-    marginRight: 10,
-  },
-  userName: {
-    fontSize: 16,
+  postUserName: { // Estilo para o nome do usuário
+    fontSize: 18,
     fontWeight: 'bold',
-  },
-  postText: {
-    marginVertical: 5,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    marginTop: 5,
-  },
-  actionButton: {
-    backgroundColor: '#007bff',
-    padding: 8,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  actionText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    backgroundColor: '#ff0000',
-    padding: 8,
-    borderRadius: 5,
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  repliesContainer: {
-    marginTop: 10,
-    paddingLeft: 20,
-  },
-  repliesTitle: {
-    fontWeight: 'bold',
+    color: '#007bff',
     marginBottom: 5,
   },
-  reply: {
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+  postText: {
+    fontSize: 16,
   },
-  replyUser: {
-    fontWeight: 'bold',
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
   },
-  replyText: {
-    marginTop: 2,
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    padding: 10,
+    borderRadius: 5,
   },
-  buttonContainer: {
-    marginTop: 20,
-  },
-  button: {
+  searchButton: {
     backgroundColor: '#007bff',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    padding: 10,
+    marginLeft: 10,
+    borderRadius: 5,
+  },
+  backToFeedButton: {
+    backgroundColor: '#28a745',
+    padding: 10,
+    marginTop: 15,
     borderRadius: 5,
     alignItems: 'center',
-    marginVertical: 5,
   },
-  buttonText: {
+  backToFeedButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
+  },
+  menuContainer: {
+    position: 'absolute',
+    bottom: 60,
+    right: 30,
+    alignItems: 'center',
+  },
+  menuButtonMain: {
+    backgroundColor: '#007bff',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+  },
+  menu: {
+    position: 'absolute',
+    bottom: 80, // Move o menu para cima quando aberto
+    right: 0,
+    alignItems: 'center',
+  },
+  menuButton: {
+    backgroundColor: '#007bff',
+    width: 150,
+    paddingVertical: 10,
+    borderRadius: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    elevation: 5,
+  },
+  menuButtonText: {
+    color: '#fff',
+    marginLeft: 10,
+    fontSize: 14,
   },
 });

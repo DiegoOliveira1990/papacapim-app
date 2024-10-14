@@ -306,3 +306,5 @@ export const searchPosts = async (searchTerm) => {
     throw error;
   }
 };
+
+
