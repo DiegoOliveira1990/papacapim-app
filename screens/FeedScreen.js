@@ -1,34 +1,36 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { getFeedPosts, searchPosts, deletePost, likePost, unlikePost, getLikesForPost, logoutUser } from '../api';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Modal } from 'react-native';
+import { getFeedPosts, searchPosts, deletePost, likePost, unlikePost, getLikesForPost, getRepliesForPost, replyToPost, logoutUser } from '../api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 
 export default function FeedScreen({ navigation }) {
-  const [posts, setPosts] = useState([]); // Estado para armazenar postagens
-  const [loading, setLoading] = useState(true); // Estado para indicar o carregamento do feed
-  const [searchTerm, setSearchTerm] = useState(''); // Estado para armazenar o termo de busca
-  const [menuOpen, setMenuOpen] = useState(false); // Estado para controlar a abertura do menu
-  const [userLogin, setUserLogin] = useState(null); // Estado para armazenar o login do usuário
-  const [likesState, setLikesState] = useState({}); // Estado para armazenar curtidas por post
-  const [isSearchActive, setIsSearchActive] = useState(false); // Estado para controlar se a busca está ativa
+  const [posts, setPosts] = useState([]); 
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [userLogin, setUserLogin] = useState(null);
+  const [likesState, setLikesState] = useState({});
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [isReplyModalVisible, setReplyModalVisible] = useState(false);
 
-  // Função para carregar postagens do feed e verificar curtidas
+  // Função para carregar postagens e respostas
   const loadFeed = async (user) => {
+    setLoading(true); // Ativa o estado de carregamento
     try {
-      console.log('Carregando postagens do feed...');
-      const feedPosts = await getFeedPosts(); // Chama a API para buscar as postagens
-      console.log('Postagens recebidas:', feedPosts);
-
+      const feedPosts = await getFeedPosts();
       if (feedPosts.length > 0) {
         const likesMap = {};
-        // Verifica as curtidas para cada postagem
         for (let post of feedPosts) {
           const likes = await getLikesForPost(post.id);
-          likesMap[post.id] = likes.some((like) => like.user_login === user); // Define se o post está curtido
+          likesMap[post.id] = likes.some((like) => like.user_login === user);
+          post.replies = await getRepliesForPost(post.id);
         }
-        setLikesState(likesMap); // Armazena o estado de curtidas
-        setPosts(feedPosts); // Atualiza o estado com as postagens
+        setLikesState(likesMap);
+        setPosts(feedPosts);
       } else {
         Alert.alert('Aviso', 'Nenhuma postagem disponível.');
       }
@@ -36,7 +38,7 @@ export default function FeedScreen({ navigation }) {
       console.error('Erro ao carregar o feed:', error);
       Alert.alert('Erro', 'Falha ao carregar as postagens.');
     } finally {
-      setLoading(false); // Para de exibir o indicador de carregamento
+      setLoading(false); // Desativa o estado de carregamento
     }
   };
 
@@ -44,17 +46,15 @@ export default function FeedScreen({ navigation }) {
   const handleLikeOrUnlikePost = async (postId) => {
     try {
       if (likesState[postId]) {
-        // Se já curtiu, descurtir
         const likes = await getLikesForPost(postId);
         const userLike = likes.find((like) => like.user_login === userLogin);
         if (userLike) {
           await unlikePost(postId, userLike.id);
-          setLikesState((prevState) => ({ ...prevState, [postId]: false })); // Atualiza estado para descurtido
+          setLikesState((prevState) => ({ ...prevState, [postId]: false }));
         }
       } else {
-        // Se não curtiu, curtir
         await likePost(postId);
-        setLikesState((prevState) => ({ ...prevState, [postId]: true })); // Atualiza estado para curtido
+        setLikesState((prevState) => ({ ...prevState, [postId]: true }));
       }
     } catch (error) {
       console.error('Erro ao curtir/descurtir postagem:', error.response?.data || error.message);
@@ -74,8 +74,8 @@ export default function FeedScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await deletePost(postId); // Chama a API para deletar a postagem
-              setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId)); // Atualiza o estado do feed
+              await deletePost(postId);
+              setPosts((prevPosts) => prevPosts.filter((post) => post.id !== postId));
               Alert.alert('Sucesso', 'Postagem deletada com sucesso.');
             } catch (error) {
               console.error('Erro ao deletar postagem:', error);
@@ -88,7 +88,32 @@ export default function FeedScreen({ navigation }) {
     );
   };
 
-  // Função para buscar postagens pelo termo de pesquisa
+  // Função para abrir o modal de resposta
+  const handleReply = (postId) => {
+    setSelectedPostId(postId);
+    setReplyModalVisible(true);
+  };
+
+  // Função para enviar resposta
+  const handleSendReply = async () => {
+    if (!replyMessage.trim()) {
+      Alert.alert('Erro', 'Por favor, escreva uma mensagem.');
+      return;
+    }
+
+    try {
+      await replyToPost(selectedPostId, replyMessage);
+      setReplyModalVisible(false);
+      setReplyMessage('');
+      loadFeed(userLogin);
+      Alert.alert('Sucesso', 'Resposta enviada com sucesso.');
+    } catch (error) {
+      console.error('Erro ao responder a postagem:', error);
+      Alert.alert('Erro', 'Falha ao responder a postagem.');
+    }
+  };
+
+  // Função para buscar postagens
   const handleSearch = async () => {
     if (!searchTerm.trim()) {
       Alert.alert('Erro', 'Por favor, insira um termo de busca.');
@@ -98,11 +123,10 @@ export default function FeedScreen({ navigation }) {
     setLoading(true);
 
     try {
-      const searchResults = await searchPosts(searchTerm); // Chama a função de busca da API
-      console.log('Resultados da busca:', searchResults);
+      const searchResults = await searchPosts(searchTerm);
       if (searchResults.length > 0) {
-        setPosts(searchResults); // Atualiza o estado com os resultados da busca
-        setIsSearchActive(true); // Define a busca como ativa
+        setPosts(searchResults);
+        setIsSearchActive(true);
       } else {
         Alert.alert('Nenhuma postagem encontrada.');
       }
@@ -114,31 +138,36 @@ export default function FeedScreen({ navigation }) {
     }
   };
 
-  // Função para voltar ao feed após a busca
   const handleBackToFeed = () => {
     setSearchTerm('');
     setIsSearchActive(false);
-    loadFeed(userLogin); // Carrega o feed original
+    loadFeed(userLogin);
   };
 
-  // Carrega as postagens ao montar o componente
   useEffect(() => {
     const fetchUserLogin = async () => {
-      const storedUserLogin = await AsyncStorage.getItem('userLogin'); // Obtenha o login do usuário atual
+      const storedUserLogin = await AsyncStorage.getItem('userLogin');
       setUserLogin(storedUserLogin);
       if (storedUserLogin) {
-        await loadFeed(storedUserLogin); // Carrega o feed para o usuário logado
+        await loadFeed(storedUserLogin);
       }
     };
     fetchUserLogin();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      loadFeed(userLogin); // Carrega o feed quando a tela for foco
+    }, [userLogin])
+  );
+  
   // Função de logout
   const handleLogout = async () => {
+    if (loading) return; // Evita logout durante o carregamento
     const sessionId = await AsyncStorage.getItem('sessionId');
     try {
       await logoutUser(sessionId);
-      await AsyncStorage.clear(); // Limpar dados armazenados localmente
+      await AsyncStorage.clear();
       navigation.navigate('Login');
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
@@ -146,7 +175,6 @@ export default function FeedScreen({ navigation }) {
     }
   };
 
-  // Renderização de cada item (post) da lista
   const renderItem = ({ item }) => (
     <View style={styles.postContainer}>
       <View style={styles.postContent}>
@@ -168,12 +196,29 @@ export default function FeedScreen({ navigation }) {
           onPress={() => handleLikeOrUnlikePost(item.id)}
         >
           <FontAwesome
-            name={likesState[item.id] ? "thumbs-up" : "thumbs-o-up"} // Muda o ícone conforme curtido ou não
+            name={likesState[item.id] ? "thumbs-up" : "thumbs-o-up"}
             size={20}
-            color={likesState[item.id] ? '#00ff00' : '#ccc'} // Verde se curtido, cinza se não curtido
+            color={likesState[item.id] ? '#00ff00' : '#ccc'}
           />
         </TouchableOpacity>
+        {/* Botão de responder */}
+        <TouchableOpacity style={styles.replyButton} onPress={() => handleReply(item.id)}>
+          <FontAwesome name="reply" size={20} color="#fff" />
+          <Text style={styles.replyButtonText}>Responder</Text>
+        </TouchableOpacity>
       </View>
+      {/* Exibir respostas */}
+      {item.replies && item.replies.length > 0 && (
+        <View style={styles.repliesContainer}>
+          <Text style={styles.repliesTitle}>Respostas:</Text>
+          {item.replies.map((reply) => (
+            <View key={reply.id} style={styles.replyItem}>
+              <Text style={styles.replyUserName}>{reply.user_login}</Text>
+              <Text>{reply.message}</Text>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 
@@ -214,14 +259,39 @@ export default function FeedScreen({ navigation }) {
         </TouchableOpacity>
       )}
 
+      {/* Modal de Resposta */}
+      <Modal
+        visible={isReplyModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setReplyModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <TextInput
+              style={styles.replyInput}
+              placeholder="Escreva sua resposta..."
+              value={replyMessage}
+              onChangeText={setReplyMessage}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalButton} onPress={handleSendReply}>
+                <Text style={styles.modalButtonText}>Enviar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButton} onPress={() => setReplyModalVisible(false)}>
+                <Text style={styles.modalButtonText}>Cancelar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Menu Expansível */}
       <View style={styles.menuContainer}>
-        {/* Botão principal do menu */}
         <TouchableOpacity style={styles.menuButtonMain} onPress={() => setMenuOpen(!menuOpen)}>
           <FontAwesome name={menuOpen ? "times" : "bars"} size={24} color="#fff" />
         </TouchableOpacity>
 
-        {/* Menu de Ações */}
         {menuOpen && (
           <View style={styles.menu}>
             <TouchableOpacity style={styles.menuButton} onPress={() => navigation.navigate('Post')}>
@@ -240,8 +310,8 @@ export default function FeedScreen({ navigation }) {
               <FontAwesome name="search" size={24} color="#fff" />
               <Text style={styles.menuButtonText}>Buscar Usuários</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.menuButton} onPress={handleLogout}>
-              <FontAwesome name="sign-out" size={24} color="#fff" />
+            <TouchableOpacity style={styles.menuButton} onPress={handleLogout} disabled={loading}>
+              <FontAwesome name="sign-out" size={24} color={loading ? "#ccc" : "#fff"} />
               <Text style={styles.menuButtonText}>Logout</Text>
             </TouchableOpacity>
           </View>
@@ -263,9 +333,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
     padding: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
@@ -284,6 +352,7 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    marginTop: 10,
     alignItems: 'center',
   },
   deleteButton: {
@@ -297,6 +366,36 @@ const styles = StyleSheet.create({
     padding: 5,
     borderRadius: 5,
     marginLeft: 10,
+  },
+  replyButton: {
+    backgroundColor: '#007bff',
+    padding: 5,
+    borderRadius: 5,
+    marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  replyButtonText: {
+    color: '#fff',
+    marginLeft: 5,
+  },
+  repliesContainer: {
+    marginTop: 10,
+    paddingLeft: 20,
+    borderLeftWidth: 2,
+    borderLeftColor: '#007bff',
+  },
+  repliesTitle: {
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#007bff',
+  },
+  replyItem: {
+    marginBottom: 10,
+  },
+  replyUserName: {
+    fontWeight: 'bold',
+    color: '#007bff',
   },
   searchContainer: {
     flexDirection: 'row',
@@ -324,6 +423,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backToFeedButtonText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+  },
+  replyInput: {
+    height: 40,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    marginBottom: 10,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    backgroundColor: '#007bff',
+    padding: 10,
+    borderRadius: 5,
+  },
+  modalButtonText: {
     color: '#fff',
     fontSize: 16,
   },

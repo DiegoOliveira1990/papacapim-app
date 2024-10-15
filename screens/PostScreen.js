@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { createPost } from '../api'; // Certifique-se de que essa função está implementada
+import { createPost } from '../api';
 
-export default function PostScreen({ navigation, route }) {
+export default function PostScreen({ navigation }) {
   const [postContent, setPostContent] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -15,11 +15,8 @@ export default function PostScreen({ navigation, route }) {
     setLoading(true);
 
     try {
-      await createPost(postContent); // Envia o conteúdo da postagem para a API
+      await createPost(postContent);
       setLoading(false);
-      if (route.params?.refreshFeed) {
-        route.params.refreshFeed(); // Chama a função de atualizar o feed passado como parâmetro
-      }
       Alert.alert('Sucesso', 'Postagem criada com sucesso.');
       navigation.goBack(); // Volta para a tela de feed
     } catch (error) {
